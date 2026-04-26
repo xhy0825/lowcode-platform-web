@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { loginApi } from '@/api'
 import {
   ElForm,
   ElFormItem,
@@ -18,22 +19,56 @@ const userStore = useUserStore()
 const loginForm = ref({
   username: '',
   password: '',
+  captcha: '',
+  captchaKey: '',
   rememberMe: false
 })
 
 const loading = ref(false)
+const captchaImage = ref('')
+const captchaKey = ref('')
+
+// 获取验证码
+const getCaptcha = async () => {
+  try {
+    const res = await loginApi.getCaptcha()
+    captchaImage.value = res.data.captchaImage
+    captchaKey.value = res.data.captchaKey
+    loginForm.value.captchaKey = res.data.captchaKey
+  } catch (e) {
+    console.error('获取验证码失败', e)
+  }
+}
 
 const handleLogin = async () => {
+  if (!loginForm.value.username) {
+    return
+  }
+  if (!loginForm.value.password) {
+    return
+  }
   loading.value = true
   try {
-    await userStore.login(loginForm.value.username, loginForm.value.password)
+    loginForm.value.captchaKey = captchaKey.value
+    await userStore.login(
+      loginForm.value.username,
+      loginForm.value.password,
+      loginForm.value.captcha,
+      loginForm.value.captchaKey
+    )
     router.push('/dashboard')
   } catch (e) {
+    // 登录失败刷新验证码
+    getCaptcha()
     console.error(e)
   } finally {
     loading.value = false
   }
 }
+
+onMounted(() => {
+  getCaptcha()
+})
 </script>
 
 <template>
@@ -99,6 +134,22 @@ const handleLogin = async () => {
               show-password
               class="login-input"
             />
+          </el-form-item>
+          <el-form-item>
+            <div class="captcha-row">
+              <el-input
+                v-model="loginForm.captcha"
+                placeholder="请输入验证码"
+                :prefix-icon="EditPen"
+                size="large"
+                class="captcha-input"
+                maxlength="4"
+              />
+              <div class="captcha-image" @click="getCaptcha">
+                <img v-if="captchaImage" :src="captchaImage" alt="验证码" />
+                <span v-else>点击获取</span>
+              </div>
+            </div>
           </el-form-item>
           <el-form-item class="remember-item">
             <el-checkbox v-model="loginForm.rememberMe">
@@ -321,6 +372,49 @@ const handleLogin = async () => {
 
           :deep(.el-input__prefix-inner) {
             color: #409eff;
+          }
+        }
+
+        .captcha-row {
+          display: flex;
+          gap: 12px;
+
+          .captcha-input {
+            flex: 1;
+            :deep(.el-input__wrapper) {
+              border-radius: 12px;
+              box-shadow: 0 0 0 1px #e4e7ed inset;
+              padding: 4px 12px;
+              height: 44px;
+            }
+          }
+
+          .captcha-image {
+            width: 120px;
+            height: 44px;
+            border-radius: 12px;
+            border: 1px solid #e4e7ed;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            transition: border-color 0.2s;
+
+            &:hover {
+              border-color: #409eff;
+            }
+
+            img {
+              width: 100%;
+              height: 100%;
+              object-fit: cover;
+            }
+
+            span {
+              color: #909399;
+              font-size: 12px;
+            }
           }
         }
 

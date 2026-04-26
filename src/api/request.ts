@@ -10,11 +10,16 @@ const service: AxiosInstance = axios.create({
   }
 })
 
+// 是否正在刷新Token
+let isRefreshing = false
+// 重试请求队列
+let retryQueue: Array<(token: string) => void> = []
+
 // 请求拦截器
 service.interceptors.request.use(
   (config) => {
-    // 从 localStorage 获取 token
-    const token = localStorage.getItem('token')
+    // 从 localStorage 获取 accessToken
+    const token = localStorage.getItem('accessToken')
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`
     }
@@ -38,12 +43,54 @@ service.interceptors.response.use(
     }
     return res
   },
-  (error) => {
+  async (error) => {
     const status = error.response?.status
+    const config = error.config
+
     if (status === 401) {
-      ElMessage.error('登录已过期，请重新登录')
-      localStorage.removeItem('token')
-      window.location.href = '/login'
+      // 尝试刷新Token
+      const refreshToken = localStorage.getItem('refreshToken')
+      if (refreshToken && !isRefreshing) {
+        isRefreshing = true
+        try {
+          const res = await axios.post('/api/system/auth/refresh', {
+            refreshToken,
+            oldAccessToken: localStorage.getItem('accessToken')
+          })
+          const { accessToken, refreshToken: newRefreshToken } = res.data.data
+          localStorage.setItem('accessToken', accessToken)
+          localStorage.setItem('refreshToken', newRefreshToken)
+          isRefreshing = false
+
+          // 重试队列中的请求
+          retryQueue.forEach(cb => cb(accessToken))
+          retryQueue = []
+
+          // 重试当前请求
+          config.headers['Authorization'] = `Bearer ${accessToken}`
+          return service(config)
+        } catch (refreshError) {
+          // 刷新失败，清除登录状态
+          isRefreshing = false
+          localStorage.clear()
+          ElMessage.error('登录已过期，请重新登录')
+          window.location.href = '/login'
+          return Promise.reject(refreshError)
+        }
+      } else if (isRefreshing) {
+        // 正在刷新，加入队列等待
+        return new Promise((resolve) => {
+          retryQueue.push((token: string) => {
+            config.headers['Authorization'] = `Bearer ${token}`
+            resolve(service(config))
+          })
+        })
+      } else {
+        // 无refreshToken，直接跳转登录
+        localStorage.clear()
+        ElMessage.error('登录已过期，请重新登录')
+        window.location.href = '/login'
+      }
     } else if (status === 403) {
       ElMessage.error('没有权限访问')
     } else if (status === 500) {

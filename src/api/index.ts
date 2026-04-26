@@ -6,26 +6,49 @@ export interface LoginRequest {
   username: string
   password: string
   captcha?: string
+  captchaKey?: string
 }
 
 export interface LoginResponse {
-  token: string
+  accessToken: string
+  refreshToken: string
+  expiresIn: number
   user: User
+  tenantId: string
+  roles: string[]
   permissions: string[]
+  menus: any[]
+}
+
+export interface CaptchaResponse {
+  captchaKey: string
+  captchaImage: string
 }
 
 export const loginApi = {
+  // 获取验证码
+  getCaptcha(): Promise<ApiResponse<CaptchaResponse>> {
+    return request.get('/auth/captcha')
+  },
+  // 登录
   login(data: LoginRequest): Promise<ApiResponse<LoginResponse>> {
     return request.post('/auth/login', data)
   },
+  // 退出登录
   logout(): Promise<ApiResponse<void>> {
     return request.post('/auth/logout')
   },
-  getInfo(): Promise<ApiResponse<{ user: User; permissions: string[] }>> {
-    return request.get('/auth/info')
+  // 获取当前用户信息
+  getUserInfo(): Promise<ApiResponse<{ user: User; permissions: string[] }>> {
+    return request.get('/auth/user')
   },
-  refreshToken(): Promise<ApiResponse<{ token: string }>> {
-    return request.post('/auth/refresh-token')
+  // 获取用户菜单
+  getMenus(): Promise<ApiResponse<any[]>> {
+    return request.get('/auth/menus')
+  },
+  // 刷新Token
+  refreshToken(refreshToken: string, oldAccessToken?: string): Promise<ApiResponse<{ accessToken: string; refreshToken: string; expiresIn: number }>> {
+    return request.post('/auth/refresh', { refreshToken, oldAccessToken })
   }
 }
 
