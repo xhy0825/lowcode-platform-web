@@ -593,27 +593,63 @@ export interface Tenant {
   id: number
   tenantName: string
   tenantCode: string
-  packageId: number
-  expireTime: string
-  dbSchema: string
+  packageId?: number
+  expireTime?: string
+  dbSchema?: string
+  adminUserId?: number
+  status: number
+  contactName?: string
+  contactPhone?: string
+  contactEmail?: string
+  address?: string
+  createdTime?: string
+}
+
+export interface Package {
+  id: number
+  packageName: string
+  packageCode: string
+  menuIds: string
+  maxUsers: number
+  maxForms: number
+  maxFlows: number
+  maxPages: number
+  maxReports: number
+  maxStorage: number
+  price: number
   status: number
 }
 
 export const tenantApi = {
   list(params: any): Promise<ApiResponse<PageResponse<Tenant>>> {
-    return request.get('/system/tenant/list', { params })
+    return request.get('/tenant/list', { params })
   },
   get(id: number): Promise<ApiResponse<Tenant>> {
-    return request.get(`/system/tenant/${id}`)
+    return request.get(`/tenant/${id}`)
   },
-  create(data: Tenant): Promise<ApiResponse<void>> {
-    return request.post('/system/tenant', data)
+  create(data: Tenant): Promise<ApiResponse<number>> {
+    return request.post('/tenant', data)
   },
   update(data: Tenant): Promise<ApiResponse<void>> {
-    return request.put('/system/tenant', data)
+    return request.put('/tenant', data)
   },
   delete(id: number): Promise<ApiResponse<void>> {
-    return request.delete(`/system/tenant/${id}`)
+    return request.delete(`/tenant/${id}`)
+  },
+  enable(id: number): Promise<ApiResponse<void>> {
+    return request.put(`/tenant/${id}/enable`)
+  },
+  disable(id: number): Promise<ApiResponse<void>> {
+    return request.put(`/tenant/${id}/disable`)
+  },
+  getPackages(): Promise<ApiResponse<Package[]>> {
+    return request.get('/tenant/packages')
+  },
+  checkCode(tenantCode: string, excludeId?: number): Promise<ApiResponse<boolean>> {
+    return request.get('/tenant/checkCode', { params: { tenantCode, excludeId } })
+  },
+  init(id: number, adminUsername?: string, adminPassword?: string): Promise<ApiResponse<void>> {
+    return request.post(`/tenant/${id}/init`, null, { params: { adminUsername, adminPassword } })
   }
 }
 
