@@ -2,18 +2,18 @@
 import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { reportApi } from '@/api'
+import { reportApi, ReportDefinition } from '@/api'
 import * as echarts from 'echarts'
 
 const router = useRouter()
 const route = useRoute()
 
-const reportInfo = ref({
+const reportInfo = ref<ReportDefinition>({
   id: 0,
   reportName: '',
   reportType: 'bar',
   dataSource: '',
-  chartConfig: {},
+  chartConfig: { showLegend: true },
   filters: [],
   status: 0
 })
@@ -72,7 +72,7 @@ const initChart = () => {
     yAxis: { type: 'value' },
     series: [{
       data: [120, 200, 150, 80, 70, 110, 130],
-      type: reportInfo.value.reportType,
+      type: reportInfo.value.reportType as 'bar' | 'line' | 'pie',
       smooth: true
     }]
   }
@@ -128,7 +128,7 @@ onMounted(() => {
             </el-select>
           </el-form-item>
           <el-form-item label="查询SQL">
-            <el-input type="textarea" rows="4" placeholder="输入SQL查询语句" />
+            <el-input type="textarea" :rows="4" placeholder="输入SQL查询语句" />
           </el-form-item>
         </el-form>
       </div>

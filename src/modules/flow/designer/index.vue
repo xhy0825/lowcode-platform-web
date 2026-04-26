@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, watch, nextTick } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { VueFlow, useVueFlow, MarkerType, Connection, Edge, Node } from '@vue-flow/core'
+import { VueFlow, useVueFlow, MarkerType, Connection, Edge, Node, PanelPosition } from '@vue-flow/core'
 import { Controls, MiniMap, Panel } from '@vue-flow/additional-components'
-import { flowApi } from '@/api'
+import { flowApi, FlowDefinition, FlowNode, FlowEdge } from '@/api'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 
@@ -12,18 +12,30 @@ const router = useRouter()
 const route = useRoute()
 
 // 流程基本信息
-const flowInfo = ref({
+interface FlowInfo {
+  id: number
+  flowName: string
+  flowCode: string
+  formId: number | null
+  formName: string
+  status: number
+  version: number
+  tenantId?: string
+  createdTime?: string
+}
+
+const flowInfo = ref<FlowInfo>({
   id: 0,
   flowName: '',
   flowCode: '',
-  formId: null as number | null,
+  formId: null,
   formName: '',
   status: 0,
   version: 1
 })
 
 // Vue Flow 实例
-const { addNodes, addEdges, removeNodes, removeEdges, fitView, getNodes, getEdges, onConnect, onNodesChange, onEdgesChange } = useVueFlow()
+const { addNodes, addEdges, removeNodes, fitView, getNodes, getEdges, onConnect, onNodesChange, onEdgesChange } = useVueFlow()
 
 // 流程节点
 const nodes = ref<Node[]>([])
@@ -165,17 +177,17 @@ onConnect((connection: Connection) => {
 })
 
 // 节点变化监听
-onNodesChange((changes) => {
+onNodesChange((_changes) => {
   nodes.value = getNodes.value
 })
 
 // 边变化监听
-onEdgesChange((changes) => {
+onEdgesChange((_changes) => {
   edges.value = getEdges.value
 })
 
-// 配置节点
-const handleConfigNode = (node: Node) => {
+// 配置节点（保留备用）
+const _handleConfigNode = (node: Node) => {
   handleSelectNode(node)
   nodeConfigVisible.value = true
 }
@@ -283,7 +295,17 @@ const loadFlowData = async () => {
   if (id && id !== 'new') {
     try {
       const res = await flowApi.get(Number(id))
-      flowInfo.value = res.data
+      flowInfo.value = {
+        id: res.data.id,
+        flowName: res.data.flowName,
+        flowCode: res.data.flowCode,
+        formId: res.data.formId,
+        formName: res.data.formName || '',
+        status: res.data.status,
+        version: res.data.version,
+        tenantId: res.data.tenantId,
+        createdTime: res.data.createdTime
+      }
 
       // 加载节点
       if (res.data.nodes) {
@@ -488,7 +510,7 @@ onMounted(() => {
           <MiniMap />
 
           <!-- 自定义面板 -->
-          <Panel position="top-right">
+          <Panel position="top-right" as="div">
             <div class="flow-info-panel">
               <el-tag>节点: {{ nodes.length }}</el-tag>
               <el-tag type="success">连线: {{ edges.length }}</el-tag>

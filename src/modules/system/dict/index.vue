@@ -90,8 +90,8 @@ const handleEditType = (row: DictType) => {
 const handleDeleteType = (row: DictType) => {
   ElMessageBox.confirm(`确认删除字典类型 "${row.dictName}" 吗?`, '提示', {
     type: 'warning'
-  }).then(() => {
-    // TODO: 删除接口
+  }).then(async () => {
+    await dictApi.deleteType(row.id)
     ElMessage.success('删除成功')
     getTypeList()
   })
@@ -124,8 +124,8 @@ const handleEditData = (row: DictData) => {
 const handleDeleteData = (row: DictData) => {
   ElMessageBox.confirm(`确认删除字典数据 "${row.dictLabel}" 吗?`, '提示', {
     type: 'warning'
-  }).then(() => {
-    // TODO: 删除接口
+  }).then(async () => {
+    await dictApi.deleteData(row.id)
     ElMessage.success('删除成功')
     getDataList(currentDictType.value)
   })

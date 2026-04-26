@@ -31,14 +31,14 @@ const formDataVisible = ref(false)
 const formData = ref<Record<string, any>>({})
 
 // 状态映射
-const actionMap: Record<string, { label: string; type: string }> = {
+const actionMap: Record<string, { label: string; type: 'primary' | 'success' | 'warning' | 'info' | 'danger' }> = {
   approve: { label: '同意', type: 'success' },
   reject: { label: '驳回', type: 'danger' },
   delegate: { label: '转办', type: 'warning' },
   cancel: { label: '撤销', type: 'info' }
 }
 
-const statusMap: Record<string, { label: string; type: string }> = {
+const statusMap: Record<string, { label: string; type: 'primary' | 'success' | 'warning' | 'info' | 'danger' }> = {
   pending: { label: '待处理', type: 'warning' },
   approved: { label: '已同意', type: 'success' },
   rejected: { label: '已驳回', type: 'danger' },

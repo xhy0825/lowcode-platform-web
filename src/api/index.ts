@@ -93,7 +93,7 @@ export const dictApi = {
 
 export interface Role {
   id: number
-  tenantId: string
+  tenantId?: string
   roleName: string
   roleCode: string
   dataScope: string
@@ -101,7 +101,7 @@ export interface Role {
   remark: string
   permissionIds?: number[]
   deptIds?: number[]
-  createdTime: string
+  createdTime?: string
 }
 
 export const roleApi = {
@@ -223,15 +223,15 @@ export const commandApi = {
 
 export interface FormDefinition {
   id: number
-  tenantId: string
+  tenantId?: string
   formName: string
   formCode: string
   modelId: number | null
-  fieldConfig: string
-  layoutConfig: string
+  fieldConfig?: string
+  layoutConfig?: string
   status: number
-  version: number
-  createdTime: string
+  version?: number
+  createdTime?: string
 }
 
 export interface FieldConfig {
@@ -246,8 +246,15 @@ export interface FieldConfig {
   isHidden: number
   colSpan: number
   rowOrder: number
-  validateRegex: string
-  extraConfig: Record<string, any>
+  // 校验配置
+  validateType?: string  // 预设校验类型: email/phone/idcard/url/number/custom
+  validateRegex?: string  // 自定义正则表达式
+  validateMessage?: string  // 校验失败提示信息
+  minLength?: number  // 最小长度
+  maxLength?: number  // 最大长度
+  minValue?: number  // 最小值(数字字段)
+  maxValue?: number  // 最大值(数字字段)
+  extraConfig?: Record<string, any>
 }
 
 export const formApi = {
@@ -296,6 +303,7 @@ export interface User {
   avatar: string
   status: number
   deptId: number
+  deptName?: string
   roles?: string[]
   createdTime: string
 }
@@ -337,7 +345,7 @@ export const userApi = {
 
 export interface FlowDefinition {
   id: number
-  tenantId: string
+  tenantId?: string
   flowName: string
   flowCode: string
   formId: number | null
@@ -347,7 +355,7 @@ export interface FlowDefinition {
   status: number
   version: number
   description?: string
-  createdTime: string
+  createdTime?: string
 }
 
 export interface FlowNode {
@@ -467,14 +475,14 @@ export const flowApi = {
 
 export interface PageDefinition {
   id: number
-  tenantId: string
+  tenantId?: string
   pageName: string
   pageCode: string
   pageType: string
   modelId: number | null
   components: any[]
   status: number
-  createdTime: string
+  createdTime?: string
 }
 
 export const pageApi = {
@@ -499,14 +507,14 @@ export const pageApi = {
 
 export interface ReportDefinition {
   id: number
-  tenantId: string
+  tenantId?: string
   reportName: string
   reportType: string
   dataSource: string
-  chartConfig: any
-  filters: any[]
+  chartConfig?: any
+  filters?: any[]
   status: number
-  createdTime: string
+  createdTime?: string
 }
 
 export const reportApi = {
@@ -586,10 +594,54 @@ export const tenantApi = {
   }
 }
 
-// ==================== 数据模型补充 ====================
+// ==================== 数据模型 ====================
+
+export interface DataModel {
+  id: number
+  tenantId?: string
+  modelName: string
+  modelCode: string
+  tableName: string
+  description: string
+  status: number
+  version: number
+  createdTime?: string
+  fields?: DataModelField[]
+}
+
+export interface DataModelField {
+  id?: number
+  modelId?: number
+  tenantId?: string
+  fieldName: string
+  fieldCode: string
+  columnName: string
+  fieldType: string
+  length: number
+  precision: number
+  scale: number
+  isRequired: number
+  isUnique: number
+  isIndexed: number
+  isPrimary: number
+  defaultValue: string
+  dictType: string
+  relationType: string
+  relationModelId: number
+  orderNum: number
+  delFlag?: number
+}
+
+export interface DataModelIndex {
+  id: number
+  modelId: number
+  indexName: string
+  indexType: string
+  indexColumns: string
+}
 
 export const modelApi = {
-  list(params: any): Promise<ApiResponse<PageResponse<any>>> {
+  list(params: any): Promise<ApiResponse<PageResponse<DataModel>>> {
     return request.get('/data/model/list', { params })
   },
   get(id: number): Promise<ApiResponse<any>> {

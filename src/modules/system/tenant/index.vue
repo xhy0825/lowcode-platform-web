@@ -14,6 +14,26 @@ const query = reactive({
   status: undefined as number | undefined
 })
 
+// 弹窗
+const dialogVisible = ref(false)
+const dialogTitle = ref('')
+const tenantForm = ref<Tenant>({
+  id: 0,
+  tenantName: '',
+  tenantCode: '',
+  packageId: 0,
+  expireTime: '',
+  dbSchema: '',
+  status: 0
+})
+
+// 套餐选项
+const packageOptions = [
+  { label: '基础版', value: 1 },
+  { label: '专业版', value: 2 },
+  { label: '企业版', value: 3 }
+]
+
 const getList = async () => {
   loading.value = true
   try {
@@ -25,8 +45,50 @@ const getList = async () => {
   }
 }
 
+// 新增
+const handleAdd = () => {
+  dialogTitle.value = '新增租户'
+  tenantForm.value = {
+    id: 0,
+    tenantName: '',
+    tenantCode: '',
+    packageId: 1,
+    expireTime: '',
+    dbSchema: '',
+    status: 0
+  }
+  dialogVisible.value = true
+}
+
 const handleEdit = (row: Tenant) => {
-  // TODO: 编辑弹窗
+  dialogTitle.value = '编辑租户'
+  tenantForm.value = { ...row }
+  dialogVisible.value = true
+}
+
+// 提交表单
+const handleSubmit = async () => {
+  if (!tenantForm.value.tenantName) {
+    ElMessage.warning('请输入租户名称')
+    return
+  }
+  if (!tenantForm.value.tenantCode) {
+    ElMessage.warning('请输入租户编码')
+    return
+  }
+  try {
+    if (tenantForm.value.id) {
+      await tenantApi.update(tenantForm.value)
+      ElMessage.success('修改成功')
+    } else {
+      await tenantApi.create(tenantForm.value)
+      ElMessage.success('新增成功')
+    }
+    dialogVisible.value = false
+    getList()
+  } catch (e) {
+    console.error(e)
+  }
 }
 
 const handleDelete = (row: Tenant) => {
@@ -76,7 +138,7 @@ onMounted(() => {
       <template #header>
         <div class="card-header">
           <span>租户管理</span>
-          <el-button type="primary">
+          <el-button type="primary" @click="handleAdd">
             <el-icon><Plus /></el-icon>
             新增
           </el-button>
@@ -113,6 +175,39 @@ onMounted(() => {
         @current-change="handlePageChange"
       />
     </el-card>
+
+    <!-- 新增/编辑弹窗 -->
+    <el-dialog :title="dialogTitle" v-model="dialogVisible" width="500px">
+      <el-form :model="tenantForm" label-width="100px">
+        <el-form-item label="租户名称" required>
+          <el-input v-model="tenantForm.tenantName" placeholder="请输入租户名称" />
+        </el-form-item>
+        <el-form-item label="租户编码" required>
+          <el-input v-model="tenantForm.tenantCode" placeholder="请输入租户编码" />
+        </el-form-item>
+        <el-form-item label="套餐">
+          <el-select v-model="tenantForm.packageId" style="width: 100%">
+            <el-option v-for="item in packageOptions" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="过期时间">
+          <el-date-picker v-model="tenantForm.expireTime" type="datetime" placeholder="选择过期时间" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="数据库Schema">
+          <el-input v-model="tenantForm.dbSchema" placeholder="如: tenant_001" />
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-radio-group v-model="tenantForm.status">
+            <el-radio :value="0">正常</el-radio>
+            <el-radio :value="1">禁用</el-radio>
+          </el-radio-group>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleSubmit">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 

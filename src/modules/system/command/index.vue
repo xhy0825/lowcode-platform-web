@@ -224,8 +224,8 @@ const loadTemplates = async () => {
 }
 
 // 状态格式化
-const statusFormat = (status: string) => {
-  const map: Record<string, { label: string; type: string }> = {
+const statusFormat = (status: string): { label: string; type: 'primary' | 'success' | 'warning' | 'info' | 'danger' } => {
+  const map: Record<string, { label: string; type: 'primary' | 'success' | 'warning' | 'info' | 'danger' }> = {
     running: { label: '执行中', type: 'warning' },
     success: { label: '成功', type: 'success' },
     failed: { label: '失败', type: 'danger' }

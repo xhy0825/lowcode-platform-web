@@ -28,7 +28,7 @@ const currentInstance = ref<FlowInstance | null>(null)
 const instanceNodes = ref<any[]>([])
 
 // 状态映射
-const statusMap: Record<string, { label: string; type: string }> = {
+const statusMap: Record<string, { label: string; type: 'primary' | 'success' | 'warning' | 'info' | 'danger' }> = {
   running: { label: '进行中', type: 'warning' },
   completed: { label: '已完成', type: 'success' },
   rejected: { label: '已驳回', type: 'danger' },

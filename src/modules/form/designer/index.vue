@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { formApi, FieldConfig } from '@/api'
+import { formApi, FieldConfig, FormDefinition } from '@/api'
 import Sortable from 'sortablejs'
 
 const router = useRouter()
@@ -77,6 +77,34 @@ const layoutWidgets = [
   { type: 'tabs', label: '标签页', icon: 'Folder' }
 ]
 
+// 预设校验类型
+const validateTypeOptions = [
+  { label: '无校验', value: '' },
+  { label: '邮箱', value: 'email', regex: '^[\w-]+(\.[\w-]+)*@[\w-]+(\.[\w-]+)+$', message: '请输入正确的邮箱格式' },
+  { label: '手机号', value: 'phone', regex: '^1[3-9]\d{9}$', message: '请输入正确的手机号' },
+  { label: '身份证号', value: 'idcard', regex: '^\d{17}[\dXx]$', message: '请输入正确的身份证号' },
+  { label: '网址', value: 'url', regex: '^https?://[\w\-.]+(/\S*)?$', message: '请输入正确的网址' },
+  { label: '数字', value: 'number', regex: '^\d+(\.\d+)?$', message: '请输入数字' },
+  { label: '整数', value: 'integer', regex: '^\d+$', message: '请输入整数' },
+  { label: '自定义正则', value: 'custom', regex: '', message: '校验失败' }
+]
+
+// 选择校验类型时自动填充正则和提示
+const handleValidateTypeChange = (type: string) => {
+  if (!selectedField.value) return
+  const option = validateTypeOptions.find(o => o.value === type)
+  if (option && type !== 'custom') {
+    selectedField.value.validateRegex = option.regex
+    selectedField.value.validateMessage = option.message
+  } else if (type === 'custom') {
+    selectedField.value.validateRegex = ''
+    selectedField.value.validateMessage = '校验失败'
+  } else {
+    selectedField.value.validateRegex = ''
+    selectedField.value.validateMessage = ''
+  }
+}
+
 // 字段类型默认配置
 const getDefaultFieldConfig = (type: string): FieldConfig => {
   const defaults: Record<string, Partial<FieldConfig>> = {
@@ -108,9 +136,42 @@ const getDefaultFieldConfig = (type: string): FieldConfig => {
     isHidden: 0,
     colSpan: 6,
     rowOrder: fieldList.value.length,
+    validateType: '',
     validateRegex: '',
+    validateMessage: '',
+    minLength: undefined,
+    maxLength: undefined,
+    minValue: undefined,
+    maxValue: undefined,
     extraConfig: {},
     ...defaults[type]
+  }
+}
+
+// 拖拽状态
+const draggedWidgetType = ref<string | null>(null)
+
+// 开始拖拽组件
+const handleDragStart = (type: string) => {
+  draggedWidgetType.value = type
+}
+
+// 拖拽结束
+const handleDragEnd = () => {
+  draggedWidgetType.value = null
+}
+
+// 拖拽进入画布
+const handleDragOver = (e: DragEvent) => {
+  e.preventDefault()
+}
+
+// 拖拽放置
+const handleDrop = (e: DragEvent) => {
+  e.preventDefault()
+  if (draggedWidgetType.value) {
+    handleAddField(draggedWidgetType.value)
+    draggedWidgetType.value = null
   }
 }
 
@@ -250,31 +311,62 @@ const loadFormData = async () => {
       formInfo.value = res.data
       const fieldsRes = await formApi.getFields(Number(id))
       fieldList.value = fieldsRes.data || []
+      // 数据加载后重新初始化拖拽
+      destroySortable()
+      initSortable()
     } catch (e) {
       console.error(e)
     }
   }
 }
 
+// 组件卸载时清理
+onUnmounted(() => {
+  destroySortable()
+})
+
+// Sortable 实例
+let sortableInstance: Sortable | null = null
+
 // 初始化拖拽
 const initSortable = () => {
   nextTick(() => {
     const el = document.querySelector('.field-list')
-    if (el) {
-      Sortable.create(el as HTMLElement, {
+    if (el && !sortableInstance) {
+      sortableInstance = Sortable.create(el as HTMLElement, {
         animation: 150,
         handle: '.drag-handle',
+        ghostClass: 'sortable-ghost',
+        chosenClass: 'sortable-chosen',
         onEnd: (evt) => {
           const { oldIndex, newIndex } = evt
-          if (oldIndex !== undefined && newIndex !== undefined) {
+          if (oldIndex !== undefined && newIndex !== undefined && oldIndex !== newIndex) {
             const item = fieldList.value.splice(oldIndex, 1)[0]
             fieldList.value.splice(newIndex, 0, item)
             fieldList.value.forEach((f, i) => f.rowOrder = i)
+            // 更新选中索引
+            if (selectedFieldIndex.value !== null) {
+              if (selectedFieldIndex.value === oldIndex) {
+                selectedFieldIndex.value = newIndex
+              } else if (oldIndex < selectedFieldIndex.value && newIndex >= selectedFieldIndex.value) {
+                selectedFieldIndex.value -= 1
+              } else if (oldIndex > selectedFieldIndex.value && newIndex <= selectedFieldIndex.value) {
+                selectedFieldIndex.value += 1
+              }
+            }
           }
         }
       })
     }
   })
+}
+
+// 销毁拖拽实例
+const destroySortable = () => {
+  if (sortableInstance) {
+    sortableInstance.destroy()
+    sortableInstance = null
+  }
 }
 
 // 监听字段变化更新选中
@@ -331,6 +423,9 @@ onMounted(() => {
                     class="widget-item"
                     v-for="widget in group.widgets"
                     :key="widget.type"
+                    draggable="true"
+                    @dragstart="handleDragStart(widget.type)"
+                    @dragend="handleDragEnd"
                     @click="handleAddField(widget.type)"
                   >
                     <el-icon size="24"><component :is="widget.icon" /></el-icon>
@@ -360,7 +455,7 @@ onMounted(() => {
         <div class="canvas-header">
           <span>字段列表 ({{ fieldList.length }})</span>
         </div>
-        <div class="canvas-body">
+        <div class="canvas-body" @dragover="handleDragOver" @drop="handleDrop">
           <div class="field-list" v-if="fieldList.length > 0">
             <div
               class="field-item"
@@ -391,7 +486,7 @@ onMounted(() => {
               </div>
             </div>
           </div>
-          <el-empty v-else description="请从左侧拖拽或点击添加字段" />
+          <el-empty v-else :description="draggedWidgetType ? '拖放此处添加字段' : '请从左侧拖拽或点击添加字段'" />
         </div>
       </div>
 
@@ -445,8 +540,29 @@ onMounted(() => {
             <el-form-item label="是否隐藏">
               <el-switch v-model="selectedField.isHidden" :active-value="1" :inactive-value="0" />
             </el-form-item>
-            <el-form-item label="校验规则">
-              <el-input v-model="selectedField.validateRegex" placeholder="正则表达式" />
+            <el-divider content-position="left">校验规则</el-divider>
+            <el-form-item label="校验类型">
+              <el-select v-model="selectedField.validateType" @change="handleValidateTypeChange" placeholder="选择校验类型">
+                <el-option v-for="item in validateTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="正则表达式" v-if="selectedField.validateType === 'custom' || selectedField.validateRegex">
+              <el-input v-model="selectedField.validateRegex" placeholder="输入正则表达式" />
+            </el-form-item>
+            <el-form-item label="错误提示">
+              <el-input v-model="selectedField.validateMessage" placeholder="校验失败时的提示信息" />
+            </el-form-item>
+            <el-form-item label="最小长度" v-if="['input', 'textarea', 'password'].includes(selectedField.widgetType)">
+              <el-input-number v-model="selectedField.minLength" :min="0" :max="1000" placeholder="不限" style="width: 100%" />
+            </el-form-item>
+            <el-form-item label="最大长度" v-if="['input', 'textarea', 'password'].includes(selectedField.widgetType)">
+              <el-input-number v-model="selectedField.maxLength" :min="0" :max="1000" placeholder="不限" style="width: 100%" />
+            </el-form-item>
+            <el-form-item label="最小值" v-if="selectedField.widgetType === 'number'">
+              <el-input-number v-model="selectedField.minValue" placeholder="不限" style="width: 100%" />
+            </el-form-item>
+            <el-form-item label="最大值" v-if="selectedField.widgetType === 'number'">
+              <el-input-number v-model="selectedField.maxValue" placeholder="不限" style="width: 100%" />
             </el-form-item>
           </el-form>
         </div>
@@ -489,7 +605,7 @@ onMounted(() => {
               <el-checkbox-group v-else-if="field.widgetType === 'checkbox'" />
               <el-switch v-else-if="field.widgetType === 'switch'" />
               <el-date-picker v-else-if="['date', 'datetime'].includes(field.widgetType)"
-                :type="field.widgetType"
+                :type="(field.widgetType as 'date' | 'datetime')"
                 :placeholder="field.placeholder"
                 style="width: 100%"
               />
@@ -595,9 +711,14 @@ onMounted(() => {
           padding: 16px 12px;
           border: 1px solid #e4e7ed;
           border-radius: 12px;
-          cursor: pointer;
+          cursor: grab;
           transition: all 0.2s ease;
           background: #fff;
+          user-select: none;
+
+          &:active {
+            cursor: grabbing;
+          }
 
           &:hover {
             border-color: #409eff;
@@ -652,11 +773,25 @@ onMounted(() => {
         overflow: auto;
         padding: 24px;
 
+        &:has(.field-list:hover) {
+          background: #fafafa;
+        }
+
         .field-list {
           background: #fff;
           border-radius: 12px;
           padding: 16px;
           border: 1px solid #ebeef5;
+
+          .sortable-ghost {
+            opacity: 0.4;
+            background: #f0f9ff !important;
+          }
+
+          .sortable-chosen {
+            border-color: #409eff !important;
+            box-shadow: 0 8px 16px rgba(64, 158, 255, 0.3) !important;
+          }
 
           .field-item {
             display: flex;

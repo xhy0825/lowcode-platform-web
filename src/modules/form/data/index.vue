@@ -2,7 +2,7 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { formApi, FieldConfig } from '@/api'
+import { formApi, dictApi, FieldConfig, DictData } from '@/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -17,6 +17,9 @@ const formInfo = ref({
 
 // 字段配置
 const fieldConfig = ref<FieldConfig[]>([])
+
+// 字典数据缓存
+const dictDataCache = ref<Record<string, DictData[]>>({})
 
 // 数据列表
 const dataList = ref<Record<string, any>[]>([])
@@ -41,9 +44,32 @@ const loadFormInfo = async () => {
     formInfo.value = res.data
     const fieldsRes = await formApi.getFields(id)
     fieldConfig.value = fieldsRes.data || []
+    // 加载字典数据
+    loadDictData()
   } catch (e) {
     console.error(e)
   }
+}
+
+// 加载字典数据
+const loadDictData = async () => {
+  const dictFields = fieldConfig.value.filter(f => f.dictType && ['select', 'radio', 'checkbox', 'dict'].includes(f.widgetType))
+  const dictTypes = [...new Set(dictFields.map(f => f.dictType))]
+  for (const dictType of dictTypes) {
+    if (dictType && !dictDataCache.value[dictType]) {
+      try {
+        const res = await dictApi.listData(dictType)
+        dictDataCache.value[dictType] = res.data.filter(d => d.status === 0)
+      } catch (e) {
+        console.error(`加载字典 ${dictType} 失败`, e)
+      }
+    }
+  }
+}
+
+// 获取字典选项
+const getDictOptions = (dictType: string): DictData[] => {
+  return dictDataCache.value[dictType] || []
 }
 
 // 获取数据列表
@@ -247,9 +273,12 @@ onMounted(() => {
             :disabled="field.isReadonly === 1"
             style="width: 100%"
           >
-            <!-- TODO: 从字典API获取选项 -->
-            <el-option label="选项1" value="1" />
-            <el-option label="选项2" value="2" />
+            <el-option
+              v-for="item in getDictOptions(field.dictType)"
+              :key="item.dictValue"
+              :label="item.dictLabel"
+              :value="item.dictValue"
+            />
           </el-select>
           <!-- 单选 -->
           <el-radio-group
@@ -257,8 +286,13 @@ onMounted(() => {
             v-model="formData[field.fieldCode]"
             :disabled="field.isReadonly === 1"
           >
-            <el-radio label="选项1" />
-            <el-radio label="选项2" />
+            <el-radio
+              v-for="item in getDictOptions(field.dictType)"
+              :key="item.dictValue"
+              :value="item.dictValue"
+            >
+              {{ item.dictLabel }}
+            </el-radio>
           </el-radio-group>
           <!-- 多选 -->
           <el-checkbox-group
@@ -266,8 +300,13 @@ onMounted(() => {
             v-model="formData[field.fieldCode]"
             :disabled="field.isReadonly === 1"
           >
-            <el-checkbox label="选项1" />
-            <el-checkbox label="选项2" />
+            <el-checkbox
+              v-for="item in getDictOptions(field.dictType)"
+              :key="item.dictValue"
+              :value="item.dictValue"
+            >
+              {{ item.dictLabel }}
+            </el-checkbox>
           </el-checkbox-group>
           <!-- 开关 -->
           <el-switch
@@ -279,7 +318,7 @@ onMounted(() => {
           <el-date-picker
             v-else-if="['date', 'datetime'].includes(field.widgetType)"
             v-model="formData[field.fieldCode]"
-            :type="field.widgetType"
+            :type="(field.widgetType as 'date' | 'datetime')"
             :placeholder="field.placeholder"
             :disabled="field.isReadonly === 1"
             style="width: 100%"

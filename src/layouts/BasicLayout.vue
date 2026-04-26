@@ -143,10 +143,6 @@ const handleLogout = () => {
   router.push('/login')
 }
 
-const handleMenuClick = (path: string) => {
-  router.push(path)
-}
-
 const handleGoProfile = () => {
   router.push('/profile')
 }
